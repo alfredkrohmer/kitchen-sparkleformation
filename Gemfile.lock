@@ -1,0 +1,39 @@
+PATH
+  remote: .
+  specs:
+    kitchen-sparkleformation (0.1)
+      aws-sdk (>= 2, < 3)
+      sparkle_formation (>= 3, < 4)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    attribute_struct (0.3.4)
+      bogo (>= 0.1.31, < 0.3.0)
+    aws-sdk (2.9.14)
+      aws-sdk-resources (= 2.9.14)
+    aws-sdk-core (2.9.14)
+      aws-sigv4 (~> 1.0)
+      jmespath (~> 1.0)
+    aws-sdk-resources (2.9.14)
+      aws-sdk-core (= 2.9.14)
+    aws-sigv4 (1.0.0)
+    bogo (0.2.8)
+      hashie
+      multi_json
+    hashie (3.5.5)
+    jmespath (1.3.1)
+    multi_json (1.12.1)
+    sparkle_formation (3.0.20)
+      attribute_struct (>= 0.3.0, < 0.5)
+      bogo
+      multi_json
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  kitchen-sparkleformation!
+
+BUNDLED WITH
+   1.12.5
