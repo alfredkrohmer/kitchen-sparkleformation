@@ -4,7 +4,7 @@
 
 Put this in your Gemfile:
 ```ruby
-gem 'kitchen-sparkleformation', git: 'https://github.com/devkid/kitchen-sparkleformation'
+gem 'kitchen-sparkleformation'
 ```
 
 and run:
