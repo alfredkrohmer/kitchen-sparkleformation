@@ -1,6 +1,7 @@
 require 'aws-sdk'
 require 'sparkle_formation'
 require 'securerandom'
+require 'kitchen'
 
 module Kitchen
   module Driver
