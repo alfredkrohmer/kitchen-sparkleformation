@@ -1,10 +1,10 @@
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
 gemspec
 
-
-group :test do
-  gem "rspec"
-  gem "rake"
-  gem "rspec-json_expectations"
+group :test, optional: true do
+  gem 'rake'
+  gem 'rspec'
+  gem 'rspec-json_expectations'
+  gem 'rubocop'
 end

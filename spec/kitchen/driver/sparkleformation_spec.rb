@@ -1,14 +1,17 @@
 require "kitchen/driver/sparkleformation"
-require "aws-sdk"
+require "kitchen/provisioner/dummy"
+require "kitchen/transport/dummy"
+require "kitchen/verifier/dummy"
+require "rspec/json_expectations"
 
 describe Kitchen::Driver::Sparkleformation do
   let(:state) { {} }
 
   let(:config) do
     {
-      :sparkle_path => "spec/sparkleformation",
-      :sparkle_template => "test_template",
-      :stack_name => "test-stack"
+      sparkle_path:     'spec/sparkleformation',
+      sparkle_template: 'test_template',
+      stack_name:       'test-stack'
     }
   end
   let(:driver) { Kitchen::Driver::Sparkleformation.new(config) }

@@ -1,4 +1,4 @@
-SparkleFormation.new(:compute, :provider => :aws) do
+SparkleFormation.new(:compute, provider: :aws) do
   AWSTemplateFormatVersion '2010-09-09'
   description 'Sparkle Guide Compute Template'
 
@@ -24,6 +24,4 @@ SparkleFormation.new(:compute, :provider => :aws) do
     description 'Compute instance public address'
     value attr!(:sparkle_ec2_instance, :public_ip)
   end
-
 end
-

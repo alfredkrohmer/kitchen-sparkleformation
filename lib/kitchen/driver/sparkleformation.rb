@@ -5,6 +5,7 @@ require 'kitchen'
 
 module Kitchen
   module Driver
+    # SparkleFormation driver for test-kitchen
     class Sparkleformation < Kitchen::Driver::Base
       default_config :stack_name_random_suffix, false
       default_config :sparkle_path, 'sparkleformation'
@@ -22,6 +23,7 @@ module Kitchen
         'AWS::EC2::SpotFleet',
         'AWS::AutoScaling::AutoScalingGroup'
       ]
+      @@mutex = Mutex.new # rubocop:disable Style/ClassVars
 
       def initialize(config)
         init_config config
@@ -36,34 +38,35 @@ module Kitchen
           case @stack_desc.stack_status
           when 'CREATE_IN_PROGRESS'
             @cf.wait_until :stack_create_complete, stack_name: state[:stack_id]
-          when 'CREATE_COMPLETE'
+          when 'CREATE_COMPLETE' # rubocop:disable Lint/EmptyWhen
           else
-            raise "Invalid stack state: #{@stack_desc.stack_status}"
+            raise "Invalid stack state: #{stack_desc.stack_status}"
           end
 
-          if state[:hostname].nil?
-            state[:hostname] = hostname(state[:stack_id])
-          end
+          state[:hostname] = hostname(state[:stack_id]) if state[:hostname].nil?
 
           return
         end
 
         # generate stack name
-        @stack_name = config[:stack_name]
+        @stack_name = config[:stack_name].clone
         if config[:stack_name_random_suffix]
           @stack_name << "-#{SecureRandom.hex(6)}"
         end
 
         json = generate_cloudformation_template
 
-        if config[:upload_template]
-          url = upload_template @stack_name, json
-        end
+        url = upload_template @stack_name, json if config[:upload_template]
 
         # build options for call to create_stack
         stack_options = {
           stack_name:   @stack_name,
-          parameters:   config[:cf_params].map { |k, v| { parameter_key: SparkleFormation.camel(k), parameter_value: v } }
+          parameters:   config[:cf_params].map do |k, v|
+            {
+              parameter_key: SparkleFormation.camel(k),
+              parameter_value: v
+            }
+          end
         }
         if config[:upload_template]
           stack_options[:template_url] = url
@@ -97,34 +100,37 @@ module Kitchen
       private
 
       def generate_cloudformation_template
-        info 'Generating CloudFormation template'
+        # SparkleFormation doesn't seem to be very multithreading-friendly
+        @@mutex.synchronize do
+          info 'Generating CloudFormation template'
 
-        SparkleFormation.sparkle_path = config[:sparkle_path]
+          SparkleFormation.sparkle_path = config[:sparkle_path]
 
-        formation                     = SparkleFormation.compile(config[:sparkle_template], :sparkle)
-        config[:sparkle_packs].each do |pack|
-          require pack
-          formation.sparkle.add_sparkle SparkleFormation::SparklePack.new name: pack
-        end
-        formation.compile state: config[:sparkle_state]
+          formation                     = SparkleFormation.compile(config[:sparkle_template], :sparkle)
+          config[:sparkle_packs].each do |pack|
+            require pack
+            formation.sparkle.add_sparkle SparkleFormation::SparklePack.new name: pack
+          end
+          formation.compile state: config[:sparkle_state]
 
-        # nesting
-        formation.apply_nesting do |stack_name, nested_stack_sfn, original_stack_resource|
-          unless config[:upload_template]
-            raise 'Nested stacks require template upload'
+          # nesting
+          formation.apply_nesting do |stack_name, nested_stack_sfn, original_stack_resource|
+            unless config[:upload_template]
+              raise 'Nested stacks require template upload'
+            end
+
+            info "Generating nested stack template for #{stack_name}"
+            dump = nested_stack_sfn.compile.dump!
+
+            url = upload_template "#{@stack_name}-#{stack_name}", dump
+
+            # update original stack
+            original_stack_resource.properties.delete!(:stack)
+            original_stack_resource.properties.set!('TemplateURL', url)
           end
 
-          info "Generating nested stack template for #{stack_name}"
-          dump = nested_stack_sfn.compile.dump!
-
-          url = upload_template "#{@stack_name}-#{stack_name}", dump
-
-          # update original stack
-          original_stack_resource.properties.delete!(:stack)
-          original_stack_resource.properties.set!('TemplateURL', url)
+          formation.dump
         end
-
-        formation.dump
       end
 
       def upload_template(stack_name, json)
@@ -144,7 +150,7 @@ module Kitchen
         resources  = []
         next_token = nil
         loop do
-          response  = @cf.list_stack_resources(stack_name: stack_id, next_token: next_token)
+          response = @cf.list_stack_resources(stack_name: stack_id, next_token: next_token)
           resources += response.stack_resource_summaries
           break if (next_token = response.next_token).nil?
         end
