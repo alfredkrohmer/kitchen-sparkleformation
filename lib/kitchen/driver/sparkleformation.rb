@@ -17,6 +17,12 @@ module Kitchen
       default_config :hostname_resource, nil
       default_config :hostname_attribute, nil
 
+      SUPPORTED_RESOURCE_TYPES = [
+        'AWS::EC2::Instance',
+        'AWS::EC2::SpotFleet',
+        'AWS::AutoScaling::AutoScalingGroup'
+      ]
+
       def initialize(config)
         init_config config
         @cf = Aws::CloudFormation::Client.new
@@ -156,8 +162,8 @@ module Kitchen
         resources = stack_resources stack_id
 
         if config[:hostname_resource].nil?
-          resource = resources.find { |r| r.resource_type == 'AWS::EC2::Instance' }
-          raise 'Stack does not contain an EC2 instance' if resource.nil?
+          resource = resources.find { |r| SUPPORTED_RESOURCE_TYPES.include? r.resource_type }
+          raise "Stack does not contain a supported resource: #{SUPPORTED_RESOURCE_TYPES.join ','}" if resource.nil?
         else
           resource = resources.find { |r| r.logical_resource_id == config[:hostname_resource] }
           raise "Resource »#{config[:hostname_resource]}« not found in stack" if resource.nil?
@@ -167,12 +173,20 @@ module Kitchen
           return resource.physical_resource_id
         end
 
-        unless resource.resource_type == 'AWS::EC2::Instance'
-          raise "Resource »#{config[:hostname_resource]}« is not of type AWS::EC2::Instance"
+        unless SUPPORTED_RESOURCE_TYPES.include? resource.resource_type
+          raise "Resource »#{config[:hostname_resource]}« is not of any supported type: #{SUPPORTED_RESOURCE_TYPES.join ','}"
         end
 
         ec2 = Aws::EC2::Client.new
-        instance = ec2.describe_instances(instance_ids: [resource.physical_resource_id]).reservations.first.instances.first
+        instance_id = case resource.resource_type
+                      when 'AWS::EC2::SpotFleet'
+                        ec2.describe_spot_fleet_instances(spot_fleet_request_id: resource.physical_resource_id).active_instances.first.instance_id
+                      when 'AWS::AutoScaling::AutoScalingGroup'
+                        Aws::AutoScaling::AutoScalingGroup.new(resource.physical_resource_id).instances.first.instance_id
+                      else
+                        resource.physical_resource_id
+                      end
+        instance = ec2.describe_instances(instance_ids: [instance_id]).reservations.first.instances.first
 
         if config[:hostname_attribute].nil?
           instance.private_ip_address
